@@ -3,6 +3,8 @@
 import requests
 import zipfile
 import io
+import os
+from glob import glob
 
 
 def set_slash(directory):
@@ -40,30 +42,24 @@ def retrieve_zipped_files(url, save_dir, verbose=True, timeout=10800, keep_zip_d
     """
     Downloads a ZIP file and unzip it.
     
-    Input
-    -----
-    
+    Parameters
+    ----------
     url : str
-        The URL address of the file to download.
-        
+        The URL address of the file to download.        
     save_dir : str
         The path to the folder where to save the unzipped files. New 
-        folders are created as needed.
-        
+        folders are created as needed.      
     verbose : bool (default True)
-        Whether or not to print status messages along the process.
-    
+        Whether or not to print status messages along the process.    
     timeout : int (detault 10800)
         Number of seconds to wait for download before giving up. Default 
-        is 3 hours.
-    
+        is 3 hours.    
     keep_zip_dir : bool (default True)
         Wheter or not to unzip the content of the zip file into a folder of same name
         (inside `save_dir` folder).
         
     Returns
     -------
-    
     Nothing
     """
     
@@ -90,4 +86,66 @@ def retrieve_zipped_files(url, save_dir, verbose=True, timeout=10800, keep_zip_d
     z.extractall(save_dir)
     if verbose:
         print('Files unzipped to ' + save_dir)
+
+
+def filestem(filename):
+    """
+    Returns the stem (str) of the `filename` (str), i.e. everything 
+    up to the last dot that usually marks the file extension
+    """
+    stem = '.'.join(filename.split('.')[:-1])
+    return stem
+
+
+def sync_remote_zipped_files(url, save_dir, verbose=True, timeout=10800, keep_zip_dir=True, force_download=False):
+    """
+    Downloads a ZIP file and unzip it if requested or if not locally present.
     
+    Parameters
+    ----------
+    url : str
+        The URL address of the file to download.        
+    save_dir : str
+        The path to the folder where to save the unzipped files. New 
+        folders are created as needed.      
+    verbose : bool (default True)
+        Whether or not to print status messages along the process.    
+    timeout : int (detault 10800)
+        Number of seconds to wait for download before giving up. Default 
+        is 3 hours.    
+    keep_zip_dir : bool (default True)
+        Wheter or not to unzip the content of the zip file into a folder of same name
+        (inside `save_dir` folder).
+    force_download : bool
+        If True, download the file again and overwrite it. If False, do not
+        download the file if it is already present.
+        
+    Returns
+    -------
+    Nothing
+    """
+    
+    # Get local file pattern:
+    zip_filename = url.split('/')[-1]
+    stem = filestem(zip_filename)
+    file_pattern = os.path.join(save_dir, stem)
+    # Get matching files:
+    matching_files = glob(file_pattern) + glob(file_pattern + '.*')
+
+    # Warning (more than one match, I don't know what to do):
+    if len(matching_files) > 1 and verbose is True:
+        # More than one match, I don't know what to do:
+        print('!! Found more than one matching file or folder.')
+        print(matching_files)
+        
+    # Found local file:
+    if len(matching_files) > 0:
+        # Download file:
+        if force_download is True:
+            print('Found a local file, will overwrite.')
+            retrieve_zipped_files(url, save_dir, verbose=verbose, timeout=timeout, keep_zip_dir=keep_zip_dir)
+        else:
+            print('Found a local file, skip download.')
+    else:
+        print('No local file found.')
+        retrieve_zipped_files(url, save_dir, verbose=verbose, timeout=timeout, keep_zip_dir=keep_zip_dir)
