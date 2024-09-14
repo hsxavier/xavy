@@ -172,7 +172,7 @@ def unique_traits(df, agg_by, id_cols, agg_is_index=False):
     return id_df
 
 
-def add_column_suffix(df, suffix, inplace=False):
+def add_column_suffix(df, suffix, inplace=False, prefix=False):
     """
     Rename a DataFrame's columns by adding a suffix
     to them.
@@ -188,6 +188,8 @@ def add_column_suffix(df, suffix, inplace=False):
         Whether to change the columns' names in place
         and return None or to keep `df` as it is and
         return the transformed DataFrame
+    prefix : bool
+        If True, add `suffix` as a prefix instead.
         
     Returns
     -------
@@ -199,7 +201,11 @@ def add_column_suffix(df, suffix, inplace=False):
     """
     # Build translator:
     cols = df.columns
-    new_cols = [str(col) + suffix for col in cols]
+    if prefix == True:
+        new_cols = [suffix + str(col) for col in cols]
+    else:
+        new_cols = [str(col) + suffix for col in cols]
+        
     translator = dict(zip(cols, new_cols))
     
     # Rename columns:
@@ -539,3 +545,75 @@ def std_string_series(series, case=None):
         new_series = new_series.str.lower()
 
     return new_series
+
+
+def sel_col_by_regex(df, pattern, regex=True, case=True, negate=False):
+    """
+    Returns the columns in `df` that matches the `pattern`.
+    
+    Parameters
+    ----------
+    df : DataFrame
+        Dataframe to filter its columns.
+    pattern : str
+        Regular expression or string (if `regex` is False) to look for 
+        in the column names.
+    regex : bool
+        Whether `pattern` is a regular expression (True) or a string 
+        (False).
+    case : bool
+        Whether to distinguish the letter case or not.
+    negate : bool
+        If True, return the columns that DO NOT match `pattern`.
+       
+    Returns
+    -------
+    
+    columns : Pandas Index
+        The columns in `df` that matches the `pattern` (or that do not 
+        match, if `negate` is True).
+    """
+
+    selector = df.columns.str.contains(pattern, regex=regex, case=case)
+    if negate == True:
+        return df.columns[~selector]
+    else:
+        return df.columns[selector]
+
+
+def split_constant_cols(df, select=False, axis=1):
+    """
+    Either remove or select constant columns or rows from DataFrame.
+    
+    Parameters
+    ----------
+    df : DataFrame
+        The table to be transformed.
+    select : bool
+        If False, return the DataFrame without the constant columns
+        or rows. If True, return these columns or rows.
+    axis : int
+        If 1, either remove or select columns. If 0, either remove
+        or select rows.
+    """
+    
+    # Security checks:
+    assert axis in {0, 1}
+    assert select in {True, False}
+    
+    # Count the number of distinct values in each column (or row):
+    nunique_per_col = df.nunique(dropna=False, axis=1-axis)
+    # Select unique columns (or rows):
+    constant_cols = nunique_per_col.loc[nunique_per_col == 1].index
+    
+    if select == False:
+        # Remove constant columns (or rows):
+        out_df = df.drop(constant_cols, axis=axis)
+    else:
+        # Select constant columns (or rows):
+        if axis == 1:
+            out_df = df.loc[:, constant_cols]
+        else:
+            out_df = df.loc[constant_cols, :]
+    
+    return out_df
