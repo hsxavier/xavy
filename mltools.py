@@ -50,6 +50,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 from sklearn.utils import check_array
+from sklearn.linear_model import LinearRegression, HuberRegressor
 
 
 ###########################################
@@ -1220,7 +1221,218 @@ class UnsupervisedEnsemble:
         y = self.predict(X)
         return y
     
+
+class PowerLaw(BaseEstimator):
+    """
+    One-dimensional power-law regressor.
     
+    Parameters
+    ----------
+    n_jobs : int, default=None
+        The number of jobs to use for the computation. This will only provide
+        speedup in case of sufficiently large problems, that is if firstly
+        `n_targets > 1` and secondly `X` is sparse or if `positive` is set
+        to `True`. ``None`` means 1 unless in a
+        :obj:`joblib.parallel_backend` context. ``-1`` means using all
+        processors. See :term:`Glossary <n_jobs>` for more details.
+    flat_x : bool
+        Whether X should be considered a 1D array with shape (n_instances,) 
+        or not (i.e. the usual scikit-learn shape).
+    huber : bool
+        Whether to use a Huber regressor (that is robust to outliers) or not
+        (i.e. use a Least Squares Regressor).
+    epsilon : float, greater than 1.0, default=1.35
+        The parameter epsilon controls the number of samples that should be
+        classified as outliers. The smaller the epsilon, the more robust it is
+        to outliers. Only used if `huber = True`.
+    max_iter : int, default=100
+        Maximum number of iterations that
+        ``scipy.optimize.minimize(method="L-BFGS-B")`` should run for.
+         Only used if `huber = True`.
+    alpha : float, default=0.0 (no regularization).
+        Regularization parameter. Only used if `huber = True`.
+    warm_start : bool, default=False
+        This is useful if the stored attributes of a previously used model
+        has to be reused. If set to False, then the coefficients will
+        be rewritten for every call to fit. Only used if `huber = True`.
+        See :term:`the Glossary <warm_start>`.
+    fit_intercept : bool, default=True
+        Whether or not to fit the intercept. This can be set to False
+        if the data is already centered around the origin.  Only used if 
+        `huber = True`.
+    tol : float, default=1e-05
+        The iteration will stop when
+        ``max{|proj g_i | i = 1, ..., n}`` <= ``tol``
+        where pg_i is the i-th component of the projected gradient.
+        Only used if `huber = True`.
+    """
+    def __init__(self, n_jobs=None, flat_x=False, huber=False, epsilon=1.35, max_iter=100, alpha=0.0, warm_start=False, tol=1e-05):
+        
+        # Copy parameters:
+        self.n_jobs     = n_jobs
+        self.flat_x     = flat_x
+        self.huber      = huber
+        self.epsilon    = epsilon
+        self.max_iter   = max_iter
+        self.alpha      = alpha
+        self.warm_start = warm_start
+        self.tol        = tol
+        
+    def fit(self, X, y):
+        """
+        Fit a power-law: y = y0 * X ** beta.
+        """
+        # Standardize input:
+        if self.flat_x == True:
+            logX = np.transpose([np.log(X)])
+        else:
+            logX = np.log(X)
+        # Transform y:
+        logy = np.log(y)
+        
+        # Fit linear model:
+        if self.huber == True:
+            self.linear_model = HuberRegressor(epsilon=self.epsilon, max_iter=self.max_iter, alpha=self.alpha, warm_start=self.warm_start, tol=self.tol)
+        else:
+            self.linear_model = LinearRegression(n_jobs=self.n_jobs)
+        self.linear_model.fit(logX, logy)
+        
+        # Extract coefficients:
+        self.scale_ = np.exp(self.linear_model.intercept_) # Scale
+        self.exponent_ = self.linear_model.coef_[0]        # Exponent
+        
+        return self
+    
+    def predict(self, X):
+        """
+        Predict the values of y given `X` and an already
+        fitted power-law model.
+        """
+        
+        # Standardize input:
+        if self.flat_x == True:
+            xin = X
+        else:
+            xin = np.array(X)[:, 0]
+        
+        # Predict:
+        y = self.scale_ * xin ** self.exponent_
+        
+        return y
+
+    def fit_predict(self, X, y):
+
+        self.fit(X, y)
+        y = self.predict(X)
+        return y
+
+
+class Exponential(BaseEstimator):
+    """
+    One-dimensional Exponential regressor.
+    
+    Parameters
+    ----------
+    n_jobs : int, default=None
+        The number of jobs to use for the computation. This will only provide
+        speedup in case of sufficiently large problems, that is if firstly
+        `n_targets > 1` and secondly `X` is sparse or if `positive` is set
+        to `True`. ``None`` means 1 unless in a
+        :obj:`joblib.parallel_backend` context. ``-1`` means using all
+        processors. See :term:`Glossary <n_jobs>` for more details.
+    flat_x : bool
+        Whether X should be considered a 1D array with shape (n_instances,) 
+        or not (i.e. the usual scikit-learn shape).
+    huber : bool
+        Whether to use a Huber regressor (that is robust to outliers) or not
+        (i.e. use a Least Squares Regressor).
+    epsilon : float, greater than 1.0, default=1.35
+        The parameter epsilon controls the number of samples that should be
+        classified as outliers. The smaller the epsilon, the more robust it is
+        to outliers. Only used if `huber = True`.
+    max_iter : int, default=100
+        Maximum number of iterations that
+        ``scipy.optimize.minimize(method="L-BFGS-B")`` should run for.
+         Only used if `huber = True`.
+    alpha : float, default=0.0 (no regularization).
+        Regularization parameter. Only used if `huber = True`.
+    warm_start : bool, default=False
+        This is useful if the stored attributes of a previously used model
+        has to be reused. If set to False, then the coefficients will
+        be rewritten for every call to fit. Only used if `huber = True`.
+        See :term:`the Glossary <warm_start>`.
+    fit_intercept : bool, default=True
+        Whether or not to fit the intercept. This can be set to False
+        if the data is already centered around the origin.  Only used if 
+        `huber = True`.
+    tol : float, default=1e-05
+        The iteration will stop when
+        ``max{|proj g_i | i = 1, ..., n}`` <= ``tol``
+        where pg_i is the i-th component of the projected gradient.
+        Only used if `huber = True`.
+    """
+    def __init__(self, n_jobs=None, flat_x=False, huber=False, epsilon=1.35, max_iter=100, alpha=0.0, warm_start=False, tol=1e-05):
+        
+        # Copy parameters:
+        self.n_jobs     = n_jobs
+        self.flat_x     = flat_x
+        self.huber      = huber
+        self.epsilon    = epsilon
+        self.max_iter   = max_iter
+        self.alpha      = alpha
+        self.warm_start = warm_start
+        self.tol        = tol
+        
+    def fit(self, X, y):
+        """
+        Fit an exponential: y = y0 * exp(beta * x).
+        """
+        # Standardize input:
+        if self.flat_x == True:
+            linX = np.transpose([X])
+        else:
+            linX = X
+        # Transform y:
+        logy = np.log(y)
+        
+        # Fit linear model:
+        if self.huber == True:
+            self.linear_model = HuberRegressor(epsilon=self.epsilon, max_iter=self.max_iter, alpha=self.alpha, warm_start=self.warm_start, tol=self.tol)
+        else:
+            self.linear_model = LinearRegression(n_jobs=self.n_jobs)
+        self.linear_model.fit(linX, logy)
+        
+        # Extract coefficients:
+        self.scale_ = np.exp(self.linear_model.intercept_) # Scale
+        self.exponent_ = self.linear_model.coef_[0]        # Exponent
+        
+        return self
+    
+    def predict(self, X):
+        """
+        Predict the values of y given `X` and an already
+        fitted power-law model.
+        """
+        
+        # Standardize input:
+        if self.flat_x == True:
+            xin = X
+        else:
+            xin = np.array(X)[:, 0]
+        
+        # Predict:
+        y = self.scale_ * np.exp(xin * self.exponent_)
+        
+        return y
+
+    def fit_predict(self, X, y):
+
+        self.fit(X, y)
+        y = self.predict(X)
+        return y
+
+    
+
 #########################
 ### Evaluating models ###
 #########################
@@ -1602,6 +1814,57 @@ def print_cv_scores(estimator, X, y, scorers, cv=5):
             dev_mean = dev / np.sqrt(len(scores))
         
         print('{}: {:.4f} +/- {:.4f}'.format(scorer, mean, dev_mean))
+
+
+def ndcg(y_true, y_pred):
+    """
+    Compute the Normalized Discounted Cumulative Gain (nDCG)
+    metric.
+    
+    Parameters
+    ----------
+    y_true : 1D array, list or Series
+        True relevance, from the lowest (1) to the highest.
+    y_pred : 1D array, list or Series
+        Predicted relevance, used for sorting the instances.
+    
+    Returns
+    -------
+    nDCG : float
+        The metric.
+    """
+
+    # Beware of lists:
+    if type(y_true) == list:
+        y_true = np.array(y_true)
+    if type(y_pred) == list:
+        y_pred = np.array(y_pred)    
+
+    # Beware of Series:
+    if type(y_true) == pd.Series:
+        y_true = y_true.values
+    if type(y_pred) == pd.Series:
+        y_pred = y_pred.values    
+    
+    # Order true labels based on predictions:
+    sorted_idx  = np.argsort(y_pred)[::-1]
+    sorted_true = y_true[sorted_idx] - 1
+    
+    # Compute gain from relevance:
+    exp_gain = 2**sorted_true - 1
+    # Compute order discount:
+    discount = np.log2(np.arange(1, 1 + len(y_true)) + 1)
+     
+    # Compute the Discounted Cumulative Gain: 
+    DCG = np.sum(exp_gain / discount)  
+    # Compute the same for the perfect ordering:
+    ideal_gain = exp_gain[np.argsort(exp_gain)[::-1]]
+    iDCG = np.sum(ideal_gain / discount)  
+    
+    # Normalize:
+    nDCG = DCG / iDCG
+    
+    return nDCG
 
 
 #####################################
