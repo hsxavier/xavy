@@ -24,6 +24,8 @@ import requests
 import zipfile
 import io
 import os
+import gzip
+import shutil
 from glob import glob
 
 
@@ -57,6 +59,28 @@ def include_zip_dir(root_dir, url):
     """
     return concat_path([root_dir, url.split('/')[-1][:-4]])
 
+
+def gzip_decompress(filename):
+    """
+    Decompress gzip file in path `filename` (str) as the shell command
+    `gzip -d filename` would.
+    """
+
+    # Security check:
+    extension = filename.split('.')[-1]
+    assert extension == 'gz', 'Expecting ".gz" extension, found .{:}.'.format(extension)
+
+    # Create decompressed name:
+    out_name = '.'.join(filename.split('.')[:-1])
+    # Unzip and read file:
+    with gzip.open(filename, 'rb') as f_in:
+        # Create output file:
+        with open(out_name, 'wb') as f_out:
+            # Copy to output file:
+            shutil.copyfileobj(f_in, f_out)
+
+    # Delete compressed file:
+    os.remove(filename)
 
 def retrieve_zipped_files(url, save_dir, verbose=True, timeout=10800, keep_zip_dir=True):
     """
@@ -130,11 +154,11 @@ def sync_remote_zipped_files(url, save_dir, verbose=True, timeout=10800, keep_zi
         folders are created as needed.      
     verbose : bool (default True)
         Whether or not to print status messages along the process.    
-    timeout : int (detault 10800)
+    timeout : int (default 10800)
         Number of seconds to wait for download before giving up. Default 
         is 3 hours.    
     keep_zip_dir : bool (default True)
-        Wheter or not to unzip the content of the zip file into a folder of same name
+        Whether or not to unzip the content of the zip file into a folder of same name
         (inside `save_dir` folder).
     force_download : bool
         If True, download the file again and overwrite it. If False, do not
