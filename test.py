@@ -133,6 +133,7 @@ def elwise_comparison(result, output, numerical=False, verbose=False, ith_test='
         if same_len is True:
             same_idx = True
             if type(output) in (pd.core.series.Series,):
+                
                 same_idx = test_assert((result.index == output.index).all(), '{}: Function output index "{}" do not match expected `output` index "{}".'.format(ith_test, result.index, output.index))
             
             # Check dtype, if any:
@@ -141,12 +142,16 @@ def elwise_comparison(result, output, numerical=False, verbose=False, ith_test='
                 if type(output) in (pd.core.series.Series,):
                     same_dtype = test_assert(result.dtype == output.dtype, '{}: Function output dtype "{}" do not match expected `output` dtype "{}".'.format(ith_test, result.dtype, output.dtype))
 
-                # Check values:
+                # Check nulls:
                 if same_dtype:
-                    if not numerical:
-                        test_assert((result == output).all(), '{}: Function output "{}" does not match expected `output` "{}".'.format(ith_test, result, output))
-                    else:
-                        test_assert(np.isclose(result, output).all(), '{}: Function output "{}" is not close enough to expected `output` "{}".'.format(ith_test, result, output))
+                    same_nulls = test_assert((result.isnull() == output.isnull()).all(), '{}: Nulls in function output do not match expected null positions at `output`.'.format(ith_test))
+                    
+                    # Check non-null values:
+                    if same_nulls is True:
+                        if not numerical:
+                            test_assert((result.loc[~result.isnull()] == output.loc[~output.isnull()]).all(), '{}: Function output "{}" does not match expected `output` "{}".'.format(ith_test, result, output))
+                        else:
+                            test_assert(np.isclose(result.loc[~result.isnull()], output.loc[~output.isnull()]).all(), '{}: Function output "{}" is not close enough to expected `output` "{}".'.format(ith_test, result, output))
     
 
 def dataframe_comparison(result, output, verbose=False, ith_test=''):
