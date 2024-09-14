@@ -23,6 +23,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import matplotlib.pyplot as pl
 import numpy as np
 import pandas as pd
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from scipy.interpolate import SmoothBivariateSpline
 
 
 def build_alternating_divergent_series(first_instance=0):
@@ -455,3 +457,145 @@ def errorbar_hist(x, bins=None, density=False, histtype='bar', rwidth=None, colo
     
     # Plot error bars:
     hist_err_plot(x, bins=bins, density=density, ealpha=ealpha, ecolor=ecolor)
+    
+    
+def matrix_show(df, cmap, label, fignum=None, vmin=None, vmax=None):
+    """
+    Create a colormap for a matrix.
+    
+    Parameters
+    ----------
+    df : DataFrame
+        Matrix to plot. It is expected that all columns contains numbers.
+    cmap : str
+        Matplotlib colormap to be used (e.g. 'Greens', 'Coolwarm').
+    label : str
+        Label for the colorbar (i.e. what the numbers in the matrix correspond
+        to).
+    fignum : int or None
+        The number of the figure in which to create the plot (if the Figure 
+        was already created). If None, create a new Figure.
+    vmin : float or None
+        Mininum value in the color scale.
+    vmax : float or None
+        Maximum value in the color scale.
+    """
+    cols = df.columns
+    rows = df.index
+    
+    pl.matshow(df, cmap=cmap, vmin=vmin, vmax=vmax, fignum=fignum)
+    pl.xticks(ticks=range(len(cols)), labels=cols, rotation=90)
+    pl.yticks(ticks=range(len(rows)), labels=rows)
+    ax = pl.gca()
+    pl.tick_params(labelsize=10)
+    ax.xaxis.set_label_position('top')
+
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.1)
+    cbar = pl.colorbar(cax=cax)
+    cbar.ax.tick_params(labelsize=10)
+    cbar.ax.set_ylabel(label, fontsize=11)
+    
+    pl.sca(ax)
+
+
+def build_coords_pairs(x, y):
+    """
+    Create arrays of coordinates with every combination 
+    of the entries in `x` and `y`. The idea is that `x` 
+    and `y` have unique coordinate entries, and the 
+    output contains all possible combinations, as in a 
+    mesh.
+    
+    Returns
+    -------
+    x_flat : 1D array
+    y_flat : 1D array
+    """
+    
+    x_coords, y_coords = np.meshgrid(x, y, indexing='ij')
+    x_flat = x_coords.flatten()
+    y_flat = y_coords.flatten()
+    
+    return x_flat, y_flat
+
+
+def translate_linear(x, from_x, to_y):
+    """
+    Given two scales linearly related to one another,
+    translate points in one scale to another given
+    two reference points labeled in both scales.
+    
+    Parameters
+    ----------
+    x : float or array
+        Values to be translated, in the original scale.
+    from_x : (float, float)
+        Two reference points in the original scale.
+    to_y : (float, float)
+        The values of the same two reference points, 
+        but on the new scale.
+        
+    Returns
+    -------
+    y : float or array
+        Points provided in `x`, but in the new scale.
+    """
+    
+    # Get references:
+    x1, x2 = from_x
+    y1, y2 = to_y
+    
+    # Angular coef.:
+    a = (y2 - y1) / (x2 - x1)
+    # Linear coef.:
+    b = (y1*x2 - x1*y2) / (x2 - x1)
+    
+    # Translate to new linear scale:
+    y = a * x + b
+    
+    return y
+
+
+def density_scatter_plot(x, y, bins=20, counts_min=1, **kwargs):
+    """
+    Create a scatter plot in which the color of the data points
+    is proportional to the local density of points.
+    
+    Parameters
+    ----------
+    x : 1D array
+        Position of the data points on the X-axis.
+    y : 1D array
+        Position of the data points on the Y-axis.
+    bins : int or array_like or [int, int] or [array, array], optional
+        Definition of the bins used in the histogram to determine
+        the local density.
+    counts_min : float
+        When computing the uncertainty for the counts using 
+        Poisson statistics, clip the zero counts to this value.
+    kwargs : dict
+        Arguments to be passed to pl.scatter().
+    """
+    
+    # Estimate density of points with histogram:
+    counts, xedges, yedges = np.histogram2d(x, y, bins=bins)
+    # Get bin centers:
+    xcenter = (xedges[1:] + xedges[:-1]) / 2
+    ycenter = (yedges[1:] + yedges[:-1]) / 2
+
+    # Create 1D arrays of counts and coordinates:
+    counts_flat = counts.flatten()
+    x_flat, y_flat = build_coords_pairs(xcenter, ycenter)
+
+    # Compute weights for counts (Poisson, 1/sqrt(counts)):
+    w = 1.0 / np.sqrt(counts_flat.clip(min=counts_min))
+    # Piece-wise fit the counts:
+    fit = SmoothBivariateSpline(x_flat, y_flat, counts_flat, w=w)
+
+    # Get data color matching the density:
+    raw_fit = fit.ev(x, y)
+    data_color = translate_linear(raw_fit, (raw_fit.min(), raw_fit.max()), (0, 1))
+
+    # Scatter plot:
+    pl.scatter(x, y, c=data_color, **kwargs)
