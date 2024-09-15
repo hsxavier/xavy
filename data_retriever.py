@@ -106,30 +106,47 @@ def retrieve_zipped_files(url, save_dir, verbose=True, timeout=10800, keep_zip_d
     -------
     Nothing
     """
-    
+
+    # Security checks:
     assert type(timeout) == int and timeout > 0, '`timeout` should be a int > 0.'
     assert type(url) == str, '`url` should be a str.'
     assert type(save_dir) == str, '`save_dir` should be a str.'
-    assert url[-4:].lower() == '.zip', 'Expecting ZIP file.'
+    extension = url.split('.')[-1]
+    #assert extension in {'gz', 'zip'}, 'Expecting ".gz" or ".zip" extension, found .{:}.'.format(extension)
+    assert extension in {'zip'}, 'Expecting ".zip" extension, found .{:}.'.format(extension)
+    # GZIP handling not implemented.
 
+    # Download:
     if verbose:
         print('Downloading file...')
     session = requests.session()
     session.mount('http://', requests.adapters.HTTPAdapter(max_retries=3))
     response = session.get(url, timeout=timeout)
-
+    # If fail:
     if response.status_code != 200:
         raise Exception('HTTP request failed with code ' + str(response.status_code))
-    
-    if verbose:
-        print('Unzipping file...')
-    z = zipfile.ZipFile(io.BytesIO(response.content))
 
-    if keep_zip_dir == True:
-        save_dir = include_zip_dir(save_dir, url)
-    z.extractall(save_dir)
-    if verbose:
-        print('Files unzipped to ' + save_dir)
+    # Decompressing:
+    # If ZIP:
+    if extension == 'zip':
+        if verbose:
+            print('Unzipping file...')
+        z = zipfile.ZipFile(io.BytesIO(response.content))
+        if keep_zip_dir == True:
+            save_dir = include_zip_dir(save_dir, url)
+        z.extractall(save_dir)
+        if verbose:
+            print('Files unzipped to ' + save_dir)
+
+    # If GZIP:
+    elif extension == 'gz':
+        pass # Code below not working.
+        zipname = url.split('/')[-1]
+        zippath = concat_path([save_dir, zipname])
+        with open(zippath, 'wb') as fzip:
+            fzip.write(response.content)
+        gzip_decompress(zippath)
+
 
 
 def filestem(filename):
