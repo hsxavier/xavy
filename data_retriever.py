@@ -112,8 +112,8 @@ def retrieve_zipped_files(url, save_dir, verbose=True, timeout=10800, keep_zip_d
     assert type(url) == str, '`url` should be a str.'
     assert type(save_dir) == str, '`save_dir` should be a str.'
     extension = url.split('.')[-1]
-    #assert extension in {'gz', 'zip'}, 'Expecting ".gz" or ".zip" extension, found .{:}.'.format(extension)
-    assert extension in {'zip'}, 'Expecting ".zip" extension, found .{:}.'.format(extension)
+    assert extension in {'gz', 'zip'}, 'Expecting ".gz" or ".zip" extension, found .{:}.'.format(extension)
+    #assert extension in {'zip'}, 'Expecting ".zip" extension, found .{:}.'.format(extension)
     # GZIP handling not implemented.
 
     # Download:
@@ -140,12 +140,17 @@ def retrieve_zipped_files(url, save_dir, verbose=True, timeout=10800, keep_zip_d
 
     # If GZIP:
     elif extension == 'gz':
-        pass # Code below not working.
         zipname = url.split('/')[-1]
         zippath = concat_path([save_dir, zipname])
+        if verbose:
+            print('Saving gzip file...')
         with open(zippath, 'wb') as fzip:
             fzip.write(response.content)
+        if verbose:
+            print('Decompressing file...')
         gzip_decompress(zippath)
+        if verbose:
+            print('File decompressed to ' + save_dir)
 
 
 
