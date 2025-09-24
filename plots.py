@@ -599,3 +599,51 @@ def density_scatter_plot(x, y, bins=20, counts_min=1, **kwargs):
 
     # Scatter plot:
     pl.scatter(x, y, c=data_color, **kwargs)
+
+    
+def radar_plot(labels, values):
+    """
+    Create radar plots.
+
+    Parameters
+    ----------
+    labels : list-like
+        Names of the features to be plot in each dimension 
+        (angle).
+    values : array-like
+        Values (radius) of each feature (angle). If 1D, 
+        is is considered a single data series. If 2D, it 
+        will be interpreted as (n_features, n_series); it 
+        will create a radar plot for each column.
+    """
+    
+    # Number of variables:
+    n = len(labels)
+
+    # Compute angle for each axis:
+    angles = np.linspace(0, 2 * np.pi, n, endpoint=False).tolist()
+    # Repeat first point to close the loop:
+    angles += angles[:1]
+    values = np.concatenate((values, [values[0]])) 
+    
+    
+    # Create plot
+    fig, ax = pl.subplots(subplot_kw=dict(polar=True))
+    
+    ax.plot(angles, values, '-', linewidth=1)
+    ax.fill(angles, values, alpha=0.25)
+
+    # Add labels
+    #ax.set_xticks(angles[:-1])
+    #ax.set_xticklabels(labels) 
+    
+    # Add custom rotated labels:
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels([])
+    for angle, label in zip(angles[:-1], labels):
+        rotation = np.degrees(angle)   # base rotation
+        ha = "left"
+        if angle > np.pi/2 and angle < 3*np.pi/2:
+            rotation += 180
+            ha = "right"
+        ax.text(angle, ax.get_rmax() + 0.01, label, rotation=rotation, rotation_mode='anchor', ha=ha, va='center')
