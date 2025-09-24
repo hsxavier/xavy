@@ -104,12 +104,14 @@ def break_column_correlations(df, random_state=None):
         order) but with the entries in each column shuffled. Every
         column is shuffled independently.
     """
-    
-    shuffled_df = pd.DataFrame()
-    
+
+    # Create empty (NaN) table:
+    shuffled_df = pd.DataFrame(index=df.index, columns=df.columns)
+
+    # Loop over columns:
     for i, col in enumerate(df.columns):
         seed = None if random_state is None else random_state + i
-        shuffled_df[col] = shuffle_data(df[col], random_state=seed)
+        shuffled_df.loc[:, col] = shuffle_data(df[col], random_state=seed)
         
     return shuffled_df
 
