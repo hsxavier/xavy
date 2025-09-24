@@ -169,7 +169,83 @@ def multiple_knife_plots(n_cluster, X, cluster_arr, score_arr):
 ###############################
 
 
-from scipy.cluster.hierarchy import linkage, dendrogram
+from scipy.cluster.hierarchy import linkage, dendrogram, leaves_list
+from scipy.spatial.distance import squareform
+
+
+def linkage2cluster_members(linkage, names=None):
+    """
+    Return cluster members, including intermediary clusters formed by mergers.
+
+    Parameters
+    ----------
+    linkage : array or DataFrame
+        Linkage matrix created by scipy.cluster.hierarchy.linkage() function.
+        See https://docs.scipy.org/doc/scipy/reference/generated/scipy.cluster.hierarchy.linkage.html
+        It may have been put into a Pandas DataFrame.
+    names : list-like of str or None
+        If provided, replace the cluster indices in the output with names.
+    
+    Returns
+    -------
+    cluster_map : dict
+        A dict from the cluster index to instances index or names. For `n`
+        original instances, clusters with `index < n` are original instances
+        while those with `index >= n` are mergers.
+    """
+    
+    # Linkage matrix have n-1 rows, where n is the number of instances:
+    n = len(linkage) + 1      
+    
+    if type(linkage) == pd.core.frame.DataFrame:
+        linkage = linkage.values
+    
+    # Initialize original points:
+    cluster_map = {}
+    for i in range(n):
+        cluster_map[i] = [i]
+    
+    # Build cluster compositions:
+    for i, (idx1, idx2, dist, count) in enumerate(linkage):
+        idx1, idx2 = int(idx1), int(idx2)
+        cluster_map[n + i] = cluster_map[idx1] + cluster_map[idx2]
+
+    # If provided, replace cluster indices by names:
+    if type(names) != type(None):
+        for i in cluster_map.keys():
+            cluster_map[i] = [names[j] for j in cluster_map[i]]
+    
+    return cluster_map
+
+
+def cluster_distance_matrix(dist_df, method='average'):
+    """
+    Reorder the rows and columns of a distance matrix to place
+    nearby elements close to one another.
+
+    Parameters
+    ----------
+    dist_df : DataFrame
+        Symmetrical distance matrix.
+    method : str
+        Clustering method: 'single', 'complete', 'average', 
+        'weighted', 'centroid', 'median', 'ward'.
+
+    Returns
+    -------
+    sorted_dist_df : DataFrame
+        Same as `dist_df`, but with rows and columns reordered
+        so clustered instances appear close together.
+    """
+    
+    linkage_matrix = linkage(squareform(dist_df), method=method)
+    # Get optimal order:
+    optimal_order = leaves_list(linkage_matrix)
+    # Sort distance matrix:
+    sorted_dist_df = dist_df.iloc[optimal_order, optimal_order]
+
+    return sorted_dist_df
+
 
 def plot_dendrogram(X, method='ward', metric='euclidean', optimal_ordering=False, p=7, truncate_mode='level', color_threshold=None,
                     get_leaves=True, orientation='top', labels=None, count_sort=False, distance_sort=False, show_leaf_counts=True, no_plot=False,
